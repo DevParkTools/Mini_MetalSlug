@@ -372,7 +372,7 @@ const PAL_TK={h:'#3f7d4a',t:'#2f5e38',d:'#1f3d25'};
 const CH=[
 {id:0,n:'RAY',desc:'BALANCED   AMMO +30%',ab:1.3,spd:1,bombs:10,cd:12,th:0,st:[3,3,3,3],bg:'#1d3557',bg2:'#24406a',hair:'#5a3a1e',eye:'#3a6bd1',pal:{skin:'#f0c090',vest:'#e8872a',pants:'#4a5160',boot:'#222222',hat:'#2d3a8c',visor:'#5ef2ff'}},
 {id:1,n:'NOVA',desc:'FAST RUNNER   DOUBLE JUMP',dj:1,spd:1.18,bombs:8,cd:12,th:0,st:[5,2,2,3],bg:'#143d3a',bg2:'#1b4c48',hair:'#d63a8c',eye:'#1fa79a',pal:{skin:'#f6cfae',vest:'#1fa79a',pants:'#3a3f55',boot:'#222222',hat:'#d63a8c',visor:'#5ef2ff'}},
-{id:2,n:'BOLT',desc:'BIG BOMB   STRONG KNIFE',bm:1.3,md:7,spd:.92,bombs:15,cd:13,th:3,st:[2,5,5,2],bg:'#3a1c1c',bg2:'#4a2424',hair:'#2a2a2a',eye:'#5a3a1e',pal:{skin:'#c98a5a',vest:'#6b7a4a',pants:'#4a4030',boot:'#222222',hat:'#b8232a',visor:'#ffd33d'}},
+{id:2,n:'BOLT',desc:'BIG BOMB  STRONG KNIFE  VEHICLE GUARD',bm:1.3,md:7,tv:80,spd:.92,bombs:15,cd:13,th:3,st:[2,5,5,2],bg:'#3a1c1c',bg2:'#4a2424',hair:'#2a2a2a',eye:'#5a3a1e',pal:{skin:'#c98a5a',vest:'#6b7a4a',pants:'#4a4030',boot:'#222222',hat:'#b8232a',visor:'#ffd33d'}},
 {id:3,n:'IVY',desc:'RAPID FIRE   FAST WEAPONS',rf:.75,spd:1,bombs:10,cd:8,th:0,st:[3,3,2,5],bg:'#2d1f4a',bg2:'#392860',hair:'#8a4a1e',eye:'#2f8a3a',pal:{skin:'#f3d3b4',vest:'#7a49b8',pants:'#2f3548',boot:'#222222',hat:'#e6c02a',visor:'#ff8a3d'}}
 ];
 let CHR=CH[0],PAL_P=CH[0].pal;
@@ -602,7 +602,7 @@ function hitPlayer(d){
     return;
   }
   if(p.tank){
-    p.tank.hp--;p.inv=30;sfx('hurt');shake=Math.max(shake,6);
+    p.tank.hp--;p.inv=CHR.tv||30;sfx('hurt');shake=Math.max(shake,6);
     if(p.tank.hp<=0){
       boom(p.x,p.y-30,90,0,2);debris(p.x,p.y-30,12,['#4a5a3a','#2a2a30','#6a6a78'],1.2);
       p.tank=null;p.inv=100;p.vy=-9;p.g=false;p.slide=0;
