@@ -616,7 +616,8 @@ function hitPlayer(d){
 }
 function hurtEnemy(e,d){
   if(e.dead>0||e.dying||e.rm)return;
-  e.hp-=d;e.fl=4;
+  e.hp-=d;
+  if(e.k<8||e.k>9||frame-(e.ff||-99)>12){e.fl=4;e.ff=frame;}
   sfx('hit');
   if(e.k===2||e.k===3||e.k===8||e.k===9||e.k===4||e.k===10||e.k===11)sparks(e.x+(rnd()-.5)*e.w*.5,e.y-e.h*(.25+rnd()*.5),e.k===9?4:3);
   else if(e.k===5)puff(e.x,e.y-28,2,'#6a8a4a',2,14);
