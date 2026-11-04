@@ -7,6 +7,15 @@
 <style>
 html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;font-family:sans-serif}
 #wrap{position:fixed;inset:0;display:flex;justify-content:center;align-items:center}
+#stage{position:fixed;left:0;top:0;width:100%;height:100%;transform-origin:0 0}
+#gear{position:absolute;top:8px;right:10px;z-index:20;padding:6px 12px;border-radius:16px;background:rgba(0,0,0,.45);border:1.5px solid rgba(255,255,255,.55);color:#fff;font:bold 14px sans-serif;cursor:pointer}
+#sp{position:absolute;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
+#sp.on{display:flex}
+#spc{width:min(86%,340px);max-height:92%;overflow:auto;box-sizing:border-box;background:#101a34;border:2px solid #9fbcf0;border-radius:12px;padding:14px 16px;color:#fff;font:bold 16px sans-serif;display:flex;flex-direction:column;gap:12px}
+#spc h2{margin:0;font-size:20px;text-align:center;color:#ffd33d}
+#spc label{display:flex;align-items:center;gap:8px}
+#spc input{flex:1;min-width:0}
+#spc button{padding:10px;border-radius:8px;border:2px solid #9fbcf0;background:#1d2f66;color:#fff;font:bold 16px sans-serif}
 canvas{background:#000;display:block;image-rendering:crisp-edges;image-rendering:pixelated}
 #pad{position:fixed;inset:0;pointer-events:none;display:none}
 .b{position:absolute;pointer-events:auto;border-radius:50%;background:rgba(255,255,255,.16);border:2px solid rgba(255,255,255,.5);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:bold;touch-action:none}
@@ -16,8 +25,12 @@ canvas{background:#000;display:block;image-rendering:crisp-edges;image-rendering
 </style>
 </head>
 <body>
+<div id="stage">
 <div id="wrap"><canvas id="c"></canvas></div>
 <div id="pad"></div>
+<div id="gear">설정</div>
+<div id="sp"><div id="spc"><h2>설정</h2><label>소리<input id="spv" type="range" min="0" max="100" step="5"><span id="spn"></span></label><button id="spr"></button><button id="spf"></button><button id="spx">계속하기</button></div></div>
+</div>
 <script>
 const W=960,H=540,SC=2,GY=440;let LEN=7000,CAMMAX=LEN-W;
 function pix(g){
@@ -30,10 +43,18 @@ function pix(g){
   return g;
 }
 const cv=document.getElementById('c'),cx=pix(cv.getContext('2d'));
-const wrap=document.getElementById('wrap'),pad=document.getElementById('pad');
+const wrap=document.getElementById('wrap'),pad=document.getElementById('pad'),stage=document.getElementById('stage');
+let ROT=false,paused=false;
 cv.width=W*SC;cv.height=H*SC;
 const rnd=Math.random;
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+function loadSet(){
+  const d={vol:100,rot:('ontouchstart' in window||navigator.maxTouchPoints>0)?1:0};
+  try{const o=JSON.parse(localStorage.getItem('sr_set'));if(o){if(typeof o.vol==='number')d.vol=clamp(o.vol,0,100);if(o.rot===0||o.rot===1)d.rot=o.rot;}}catch(e){}
+  return d;
+}
+const SET=loadSet();
+function saveSet(){try{localStorage.setItem('sr_set',JSON.stringify(SET));}catch(e){}}
 const ov=(ax,ay,aw,ah,bx,by,bw,bh)=>ax<bx+bw&&ax+aw>bx&&ay<by+bh&&ay+ah>by;
 function rng(s){return()=>(s=(s*16807)%2147483647)/2147483647;}
 
@@ -47,7 +68,7 @@ let tapped=false;
 addEventListener('keydown',e=>{const k=kmap[e.code];if(k){inp[k]=1;e.preventDefault();ac();}});
 addEventListener('keyup',e=>{const k=kmap[e.code];if(k){inp[k]=0;e.preventDefault();}});
 addEventListener('blur',()=>{for(const k of KEYS)inp[k]=0;});
-cv.addEventListener('pointerdown',e=>{ac();tapped=true;const r=cv.getBoundingClientRect();tapX=(e.clientX-r.left)/r.width*W;tapY=(e.clientY-r.top)/r.height*H;});
+cv.addEventListener('pointerdown',e=>{ac();tapped=true;const r=cv.getBoundingClientRect();tapX=e.offsetX/cv.clientWidth*W;tapY=e.offsetY/cv.clientHeight*H;});
 
 const btnDefs=[['jump','A'],['fire','B'],['bomb','C'],['slide','D'],['out','하차']];
 const btns={};
@@ -69,6 +90,7 @@ let stkId=-1;
 function stkSet(ev){
   const r=stk.getBoundingClientRect(),R=r.width/2;
   let dx=(ev.clientX-(r.left+R))/R,dy=(ev.clientY-(r.top+R))/R;
+  if(ROT){const t=dx;dx=dy;dy=-t;}
   const m=Math.hypot(dx,dy);if(m>1){dx/=m;dy/=m;}
   inp.left=dx<-.36?1:0;inp.right=dx>.36?1:0;inp.up=dy<-.4?1:0;inp.down=dy>.4?1:0;
   kn.style.transform='translate('+dx*R*.5+'px,'+dy*R*.5+'px)';
@@ -95,7 +117,11 @@ function layoutPad(vw,vh,p){
   }
 }
 function fit(){
-  const vw=innerWidth,vh=innerHeight,p=vh>vw;
+  const iw=innerWidth,ih=innerHeight;
+  ROT=SET.rot===1&&ih>iw;
+  const vw=ROT?ih:iw,vh=ROT?iw:ih,p=vh>vw;
+  stage.style.width=vw+'px';stage.style.height=vh+'px';
+  stage.style.transform=ROT?'translateX('+iw+'px) rotate(90deg)':'none';
   let w,h;
   if(p){w=vw;h=vw*H/W;}else{const r=Math.min(vw/W,vh/H);w=W*r;h=H*r;}
   cv.style.width=w+'px';cv.style.height=h+'px';
@@ -106,8 +132,34 @@ addEventListener('resize',fit);
 addEventListener('orientationchange',fit);
 fit();
 
+const gear=document.getElementById('gear'),spEl=document.getElementById('sp'),spv=document.getElementById('spv'),spn=document.getElementById('spn'),spr=document.getElementById('spr'),spf=document.getElementById('spf'),spx=document.getElementById('spx');
+function spRefresh(){
+  spv.value=Math.round(mvol*200);spn.textContent=spv.value+'%';
+  spr.textContent='세로 화면에서 가로로 회전: '+(SET.rot?'켜짐':'꺼짐');
+  spf.textContent=document.fullscreenElement?'전체화면 끄기':'전체화면 켜기';
+}
+function spOpen(on){
+  paused=on;spEl.classList.toggle('on',on);
+  if(on){for(const k of KEYS)inp[k]=0;stkOff();for(const k in btns)btns[k].classList.remove('on');spRefresh();}
+}
+gear.addEventListener('pointerdown',ev=>ev.stopPropagation());
+gear.addEventListener('click',()=>{ac();spOpen(true);});
+spx.addEventListener('click',()=>spOpen(false));
+spv.addEventListener('input',()=>{mvol=spv.value/200;if(MG)MG.gain.value=mvol;SET.vol=+spv.value;spn.textContent=spv.value+'%';saveSet();});
+spr.addEventListener('click',()=>{SET.rot=SET.rot?0:1;saveSet();fit();spRefresh();});
+if(document.documentElement.requestFullscreen){
+  spf.addEventListener('click',async()=>{
+    try{
+      if(document.fullscreenElement)await document.exitFullscreen();
+      else{await document.documentElement.requestFullscreen();if(screen.orientation&&screen.orientation.lock)await screen.orientation.lock('landscape').catch(()=>{});}
+    }catch(e){}
+    spRefresh();
+  });
+}else spf.style.display='none';
+addEventListener('keydown',ev=>{if(ev.code==='Escape'||ev.code==='KeyP')spOpen(!paused);});
+
 let AC=null,NB=null;
-let MG=null,mvol=.5;
+let MG=null,mvol=SET.vol/200;
 function ac(){
   if(AC){if(AC.state==='suspended')AC.resume();return;}
   try{
@@ -452,7 +504,7 @@ function initLevel(){
     let dk=0;for(const q of plats)if(q.hi&&dk++%2===0)decor.push({x:q.x+q.w/2,k:F.hd[dk%F.hd.length],dy:q.y-GY});}
   spawns.sort((a,b)=>a.x-b.x);
   sp=0;
-  const pi=['H','R','S','B','U','F','L','C'],pf=[.18,.36,.52,.68,.8];
+  const pi=['H','B','R','M','U','B','S','G'],pf=[.18,.36,.52,.68,.8];
   for(let i=0;i<5;i++)pows.push({x:Math.floor(LEN*pf[i]),y:GY,item:pi[(i+mis*2)%8],st:0,t:0,anim:0});
   let hi=0;
   for(const q of plats)if(q.hi&&(hi++%2===0))pows.push({x:q.x+q.w/2,y:q.y,item:pi[(hi+mis)%8===4?5:(hi+mis)%8],st:0,t:0,anim:0});
@@ -609,7 +661,7 @@ function hitPlayer(d){
     }
     return;
   }
-  p.dead=110;p.vy=-9;p.vx=-p.face*2;lives--;p.slide=0;
+  p.dead=110;p.vy=-9;p.vx=-p.face*2;lives--;p.slide=0;powN=0;
   sfx('die');
   puff(p.x,p.y-26,12,'#b11',4,30);
   sparks(p.x,p.y-30,5);
@@ -634,7 +686,7 @@ function killEnemy(e){
     puff(e.x,e.y-26,e.k===5?12:8,e.k===5?'#5a8a3a':'#b11',3.5,26);
     if(e.k===5)debris(e.x,e.y-30,5,['#6a7a58','#3a4a3a','#8a9a70'],.7);
     const dr=rnd();
-    if(dr<.07)dropItem(e.x,e.y-30,dr<.035?'B':'H');
+    if(dr<.05)dropItem(e.x,e.y-30,dr<.035?'B':'H');
     else if(dr<.2)dropItem(e.x,e.y-30,'M');
     sfx('die2');
   }else if(e.k===6||e.k===7){
@@ -644,7 +696,7 @@ function killEnemy(e){
     dropItem(e.x,e.y-60,['L','C','F','S','R'][(rnd()*5)|0]);dropItem(e.x+30,e.y-60,'B');
     e.wr=1;e.dying=1;boom(e.x,e.y-70,60,0,2);debris(e.x,e.y-90,12,['#4a5a3a','#2a2a30','#6a6a78'],1.2);
   }else{
-    if(rnd()<.5)dropItem(e.x,e.y-40,['S','R','F','L','C','H'][(rnd()*6)|0]);
+    if(rnd()<.22)dropItem(e.x,e.y-40,['S','R','F','L','C','H'][(rnd()*6)|0]);
     if(e.k===4||e.k===12){
       boom(e.x,e.y-22,e.k===4?50:36,0,2);debris(e.x,e.y-24,9,e.k===4?['#c8503a','#8a2a1a','#e8805a']:['#4a9a3a','#2a6a22','#b8e08a'],1);e.rm=true;
     }else if(e.k===2||e.k===10){
@@ -922,8 +974,8 @@ function updEv(){
     if(v.t<=0){spawnOne(v);v.q--;v.t=22;}
   }else if(al===0&&v.t<=0){
     if(v.rd>=3){
-      v.done=true;lockX=-1;curEv=null;goT=120;
-      dropItem(cam+W*.5,GY-200,['H','S','R','B'][(rnd()*4)|0]);sfx('pick');
+      v.done=true;lockX=-1;curEv=null;goT=200;
+      dropItem(cam+W*.5,GY-200,rnd()<.4?['H','S','R'][(rnd()*3)|0]:'B');sfx('pick');
     }else{v.q=2+v.rd+(mis>>2);v.rd++;v.t=50;}
   }
 }
@@ -2771,14 +2823,14 @@ function drawPlayer(){
   }
   let pose=0;
   if(p.zom>0&&p.dead<=0){dSold(p.x,p.y,p.face,PAL_Z,p.anim*.7,p.g?7:3,false,p.flash>0,0);return;}
-  if(p.dead>0)pose=6;else if(p.melee>0)pose=5;else if(p.slide>0)pose=2;else if(p.crouch)pose=1;else if(!p.g)pose=3;
+  if(p.dead>0){pose=2;if(p.y>=GY-3)cx.globalAlpha=((frame>>3)&1)?.15:1;}else if(p.melee>0)pose=5;else if(p.slide>0)pose=2;else if(p.crouch)pose=1;else if(!p.g)pose=3;
   const mel=18-p.melee;
   MV=p.vx!==0&&p.g&&p.dead<=0;BR=!MV&&p.g&&p.dead<=0?Math.sin(frame*.1)*.8:0;
   if(p.dead>0&&p.y<GY-3){
     cx.save();cx.translate(p.x,p.y-26);cx.rotate(-p.face*(110-p.dead)*.2);
     dSold(0,26,p.face,PAL_P,p.anim,3,false,false,0);cx.restore();
   }else{WPG=p.zom>0?0:p.wp;AIMA=(!p.aimUp&&pose!==2&&pose!==5&&pose!==6&&pose!==1&&!p.zom)?(p.ay?p.aA:0):0;if(pose===1)AIMA=0;dSold(p.x,p.y,p.face,PAL_P,p.anim,pose,p.aimUp&&pose!==2&&pose!==5&&pose!==6,p.flash>0,mel);AIMA=0;WPG=0;if(p.dead<=0&&pose!==2)dAcc(p,pose===1?16:0);if(p.melee>0&&p.dead<=0)dSlash(p);}
-  BR=0;MV=false;
+  BR=0;MV=false;cx.globalAlpha=1;
 }
 const TFONT='italic 900 FSpx Impact,"Arial Black","Helvetica Neue",Arial,"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR","Noto Sans CJK KR",sans-serif';
 const RED_STOPS=[[0,'#ffe2c8'],[.18,'#ff9a52'],[.4,'#ee3a1c'],[.6,'#c01808'],[.82,'#8a0c04'],[1,'#4a0602']];
@@ -3055,8 +3107,10 @@ function hud(){
     }
   }
   if(goT>0&&((frame>>3)&1)){
-    const im=bimg('cl','구역 클리어!  전진 >>',44,ORG_STOPS,DOUT);
+    const im=bimg('cl','구역 클리어!',44,ORG_STOPS,DOUT);
     cx.drawImage(im,W/2-im.width/SC/2,170,im.width/SC,im.height/SC);
+    const gi=bimg('g','전진!',60,ORG_STOPS,DOUT);
+    cx.drawImage(gi,W-gi.width/SC-30,H/2-50,gi.width/SC,gi.height/SC);
   }
   if(routeT>0&&route>=0){
     const im=bimg('r'+mis+route,route?'루트 A : '+FK[mis].a:'루트 B : '+FK[mis].b,40,ORG_STOPS,DOUT);
@@ -3296,7 +3350,7 @@ function draw(){
 let last=0,acc=0;
 function loop(t){
   requestAnimationFrame(loop);
-  const d=Math.min(100,t-last);last=t;acc+=d;
+  const d=Math.min(100,t-last);last=t;acc=paused?0:acc+d;
   let n=0;
   while(acc>=16.667&&n<4){
     acc-=16.667;update();bgmPlay(bgmWant());
